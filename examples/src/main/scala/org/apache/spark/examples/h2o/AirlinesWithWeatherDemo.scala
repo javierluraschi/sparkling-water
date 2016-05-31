@@ -35,6 +35,7 @@ object AirlinesWithWeatherDemo extends SparkContextSupport {
     // Configure this application
     val conf: SparkConf = configure("Sparkling Water: Join of Airlines with Weather Data")
 
+    FIXME replace with spark Session
     // Create SparkContext to execute application on Spark cluster
     val sc = new SparkContext(conf)
     implicit val sqlContext = SQLContext.getOrCreate(sc)
@@ -63,8 +64,8 @@ object AirlinesWithWeatherDemo extends SparkContextSupport {
     flightsToORD.count
     println(s"\nFlights to ORD: ${flightsToORD.count}\n")
 
-    flightsToORD.toDF.registerTempTable("FlightsToORD")
-    weatherTable.toDF.registerTempTable("WeatherORD")
+    flightsToORD.toDF.createOrReplaceTempView("FlightsToORD")
+    weatherTable.toDF.createOrReplaceTempView("WeatherORD")
 
     //
     // -- Join both tables and select interesting columns

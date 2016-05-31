@@ -66,6 +66,7 @@ object AirlinesWithWeatherDemo2 extends SparkContextSupport {
   }
 
   def main(args: Array[String]): Unit = {
+    FIXME use Spark session here
     // Configure this application
     val conf: SparkConf = configure("Sparkling Water Meetup: Use Airlines and Weather Data for delay prediction")
     // Create SparkContext to execute application on Spark cluster
@@ -96,8 +97,8 @@ object AirlinesWithWeatherDemo2 extends SparkContextSupport {
     flightsToORD.count
     println(s"\nFlights to ORD: ${flightsToORD.count}\n")
 
-    flightsToORD.toDF.registerTempTable("FlightsToORD")
-    weatherTable.toDF.registerTempTable("WeatherORD")
+    flightsToORD.toDF.createOrReplaceTempView("FlightsToORD")
+    weatherTable.toDF.createOrReplaceTempView("WeatherORD")
 
     //
     // -- Join both tables and select interesting columns
