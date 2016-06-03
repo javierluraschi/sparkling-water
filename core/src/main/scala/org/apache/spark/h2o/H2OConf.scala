@@ -19,7 +19,8 @@ package org.apache.spark.h2o
 
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.h2o.backends.internal.InternalBackendConf
-import org.apache.spark.{Logging, SparkContext}
+import org.apache.spark.SparkContext
+import org.apache.spark.internal.Logging
 
 /**
   * Configuration holder which is representing

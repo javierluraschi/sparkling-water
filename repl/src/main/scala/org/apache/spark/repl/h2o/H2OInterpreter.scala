@@ -22,12 +22,14 @@
 
 package org.apache.spark.repl.h2o
 
+
 import java.net.URI
 
+import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.internal.Logging
 import org.apache.spark.repl.SparkILoop
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{SQLContext, SparkSession}
 import org.apache.spark.util.Utils
-import org.apache.spark.{Logging, SparkContext}
 
 import scala.Predef.{println => _, _}
 import scala.annotation.tailrec
@@ -66,7 +68,6 @@ class H2OInterpreter(val sparkContext: SparkContext, var sessionId: Int) extends
 
   /**
     * Get response of interpreter
-    *
     * @return
     */
   def interpreterResponse: String = {
@@ -75,7 +76,6 @@ class H2OInterpreter(val sparkContext: SparkContext, var sessionId: Int) extends
 
   /**
     * Redirected printed output coming from commands written in the interpreter
-    *
     * @return
     */
   def consoleOutput: String = {
@@ -84,7 +84,6 @@ class H2OInterpreter(val sparkContext: SparkContext, var sessionId: Int) extends
 
   /**
     * Run scala code in a string
-    *
     * @param code Code to be compiled end executed
     * @return
     */
@@ -110,7 +109,8 @@ class H2OInterpreter(val sparkContext: SparkContext, var sessionId: Int) extends
     addThunk(
       intp.beQuietDuring{
         intp.bind("sc","org.apache.spark.SparkContext", sparkContext, List("@transient"))
-        intp.bind("sqlContext","org.apache.spark.sql.SQLContext", SQLContext.getOrCreate(sparkContext), List("@transient","implicit"))
+        intp.bind("spark", "org.apache.spark.sql.SparkSession", SparkSession.builder().getOrCreate(), List("@transient"))
+        intp.bind("sqlContext","org.apache.spark.sql.SQLContext", SparkSession.builder.getOrCreate().sqlContext, List("@transient","implicit"))
 
         command(
           """
@@ -145,20 +145,39 @@ class H2OInterpreter(val sparkContext: SparkContext, var sessionId: Int) extends
       if (Utils.isWindows) {
         // Strip any URI scheme prefix so we can add the correct path to the classpath
         // e.g. file:/C:/my/path.jar -> C:/my/path.jar
-        SparkILoop.getAddedJars.map { jar => new URI(jar).getPath.stripPrefix("/") }
+        getAddedJars.map { jar => new URI(jar).getPath.stripPrefix("/") }
       } else {
         // We need new URI(jar).getPath here for the case that `jar` includes encoded white space (%20).
-        SparkILoop.getAddedJars.map { jar => new URI(jar).getPath }
+        getAddedJars.map { jar => new URI(jar).getPath }
       }
     // work around for Scala bug
     val totalClassPath = addedJars.foldLeft(
       settings.classpath.value)((l, r) => ClassPath.join(l, r))
     this.settings.classpath.value = totalClassPath
-    H2OIMain.createInterpreter(sparkContext, settings, responseWriter,sessionId)
+    H2OIMain.createInterpreter(sparkContext, settings, responseWriter, sessionId)
   }
+
+  private def getAddedJars(): Array[String] = {
+    //val conf = new SparkConf().setMaster(getMaster())
+    val envJars = sys.env.get("ADD_JARS")
+    if (envJars.isDefined) {
+      logWarning("ADD_JARS environment variable is deprecated, use --jar spark submit argument instead")
+    }
+    val jars = {
+      val userJars = Utils.getUserJars(sparkContext.getConf, isShell = true)
+      if (userJars.isEmpty) {
+        envJars.getOrElse("")
+      } else {
+        userJars.mkString(",")
+      }
+    }
+    Utils.resolveURIs(jars).split(",").filter(_.nonEmpty)
+  }
+
 
   /**
     * Initialize the compiler settings
+ *
     * @return
     */
   private def createSettings(): Settings = {
@@ -335,34 +354,5 @@ class H2OInterpreter(val sparkContext: SparkContext, var sessionId: Int) extends
 }
 
 object H2OInterpreter {
-  /**
-    * Return class server output directory of REPL Class server.
- *
-    * @return
-    */
-  def classOutputDir = {
-    if (org.apache.spark.repl.Main.interp != null) {
-      // Application was started using SparkSubmit
-      org.apache.spark.repl.Main.interp.intp.getClassOutputDirectory
-    } else {
-      REPLClassServer.getClassOutputDirectory
-    }
-  }
-
-
-  /**
-    * Return class server uri for REPL Class server.
-    * In local mode the class server is not actually used, all we need is just output directory
- *
-    * @return
-    */
-  def classServerUri = {
-    if (org.apache.spark.repl.Main.interp != null) {
-      // Application was started using SparkSubmit
-      // MM commented > org.apache.spark.repl.Main.interp.intp.classServerUri
-      ""
-    } else {
-      REPLClassServer.classServerUri
-    }
-  }
+  def classOutputDirectory = H2OIMain.classOutputDirectory
 }

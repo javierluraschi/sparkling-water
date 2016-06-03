@@ -24,6 +24,9 @@ import org.apache.spark.h2o.utils.{NodeDesc, ReflectionUtils}
 import org.apache.spark.h2o.{H2OConf, RDD}
 import org.apache.spark.scheduler.local.LocalSchedulerBackend
 import org.apache.spark.{Accumulable, SparkContext, SparkEnv}
+import org.apache.spark.scheduler.{SparkListenerBlockManagerAdded, SparkListenerBlockManagerRemoved}
+import org.apache.spark.{Accumulable, SparkContext, SparkEnv}
+import org.apache.spark.internal.Logging
 import water.H2OStarter
 import water.init.AbstractEmbeddedH2OConfig
 
@@ -225,7 +228,7 @@ private[internal] trait InternalBackendUtils extends SharedBackendUtils {
  */
 private class SparklingWaterConfig(val flatfileBVariable: Accumulable[mutable.HashSet[NodeDesc], NodeDesc],
                                    val sparkHostname: Option[String])
-  extends AbstractEmbeddedH2OConfig with org.apache.spark.internal.Logging {
+  extends AbstractEmbeddedH2OConfig with Logging {
 
     /** String containing a flatfile string filled asynchronously by different thread. */
     @volatile var flatFile:Option[String] = None
