@@ -8,6 +8,7 @@ from pysparkling.conf import H2OConf
 import h2o
 from pysparkling.conversions import FrameConversions as fc
 import warnings
+from py4j.java_gateway import java_import
 
 def _monkey_patch_H2OFrame(hc):
     @staticmethod
@@ -100,16 +101,19 @@ class H2OContext(object):
         """
         h2o_context = H2OContext(spark_context)
 
-        jvm = h2o_context._jvm # JVM
-        gw = h2o_context._gw # Py4J Gateway
-        jsc = h2o_context._jsc # JavaSparkContext
+       # do not instantiate sqlContext when already one exists
+        self._sqlContext = SQLContext.getOrCreate(self._sc)
+        self._jsc = sparkContext._jsc
+        self._jvm = sparkContext._jvm
+        self._gw = sparkContext._gateway
 
-        # Imports Sparkling Water into current JVM view
-        # We cannot use directly Py4j to import Sparkling Water packages
-        #   java_import(sc._jvm, "org.apache.spark.h2o.*")
-        # because of https://issues.apache.org/jira/browse/SPARK-5185
-        # So lets load class directly via classloader
-        # This is finally fixed in Spark 2.0 ( along with other related issues)
+       # Create H2OContext using Py4J
+        self._jhc = self._gw.jvm.org.apache.spark.h2o.H2OContext(self._jsc)
+
+    def start(self):
+        """
+        Start H2OContext.
+        """
 
         # Call the corresponding getOrCreate method
         jhc_klazz = jvm.java.lang.Thread.currentThread().getContextClassLoader().loadClass("org.apache.spark.h2o.JavaH2OContext")
@@ -165,8 +169,8 @@ class H2OContext(object):
         """
         if isinstance(h2o_frame, H2OFrame):
             j_h2o_frame = h2o_frame.get_java_h2o_frame()
-            jdf = self._jhc.asDataFrame(j_h2o_frame, copy_metadata, self._jsql_context)
-            return DataFrame(jdf,self._sql_context)
+            jdf = self._jhc.asDataFrame(j_h2o_frame, self._sqlContext._ssql_ctx)
+            return DataFrame(jdf,self._sqlContext)
 
     def as_h2o_frame(self, dataframe, framename = None):
         """

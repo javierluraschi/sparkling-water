@@ -20,7 +20,7 @@ Unit tests for PySparkling;
 """
 
 import unittest
-
+from pyspark.sql import SQLContext
 from pysparkling.context import H2OContext
 from pysparkling.conf import H2OConf
 from pyspark import SparkContext, SparkConf
@@ -35,6 +35,7 @@ class FrameTransformationsTest(unittest.TestCase):
     def setUpClass(cls):
         cls._sc = SparkContext(conf = test_utils.get_default_spark_conf())
         test_utils.set_up_class(cls)
+        cls._sql_context = SQLContext.getOrCreate(cls._sc) # we need it in order to convert rdd to dataframe
         cls._hc = H2OContext.getOrCreate(cls._sc, H2OConf(cls._sc))
 
     @classmethod
@@ -44,7 +45,8 @@ class FrameTransformationsTest(unittest.TestCase):
     # test transformation from dataframe to h2o frame
     def test_df_to_h2o_frame(self):
         hc = self._hc
-        df = self._sc.parallelize([(num,"text") for num in range(0,100)]).toDF()
+        rdd = self._sc.parallelize([(num,"text") for num in range(0,100)])
+        df = self._sql_context.createDataFrame(rdd)
         h2o_frame = hc.as_h2o_frame(df)
         self.assertEquals(h2o_frame.nrow, df.count(),"Number of rows should match")
         self.assertEquals(h2o_frame.ncol, len(df.columns),"Number of columns should match")
