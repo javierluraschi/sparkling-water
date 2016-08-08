@@ -20,7 +20,7 @@ package org.apache.spark.h2o.converters
 
 import java.lang.reflect.Constructor
 import language.postfixOps
-import org.apache.spark.h2o.H2OConf
+import org.apache.spark.h2o.SparklingEnv
 import org.apache.spark.h2o.utils.ReflectionUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partition, SparkContext, TaskContext}
@@ -44,7 +44,7 @@ class H2ORDD[A <: Product: TypeTag: ClassTag, T <: Frame] private(@transient val
                                                                   val colNamesInResult: Array[String])
                                                                  (@transient sc: SparkContext)
   extends {
-    override val isExternalBackend = H2OConf(sc).runsInExternalClusterMode
+    override val isExternalBackend = SparklingEnv.getConf.runsInExternalClusterMode
   } with RDD[A](sc, Nil) with H2ORDDLike[T] {
 
   // Get column names before building an RDD
@@ -63,11 +63,9 @@ class H2ORDD[A <: Product: TypeTag: ClassTag, T <: Frame] private(@transient val
 
   /** Number of columns in the full dataset */
   val numColsInFrame = frame.numCols()
-
   val colNamesInFrame = frame.names()
-
   val types = ReflectionUtils.types[A](colNamesInResult)
-  val expectedTypesAll: Option[Array[Byte]] = ConverterUtils.prepareExpectedTypes(isExternalBackend, types)
+  override val expectedTypes: Option[Array[Byte]] = ConverterUtils.prepareExpectedTypes(isExternalBackend, types)
 
   /**
    * :: DeveloperApi ::
@@ -166,9 +164,6 @@ class H2ORDD[A <: Product: TypeTag: ClassTag, T <: Frame] private(@transient val
 
   class H2ORDDIterator(val keyName: String, val partIndex: Int) extends H2OChunkIterator[A] {
 
-    override lazy val converterCtx: ReadConverterContext =
-      ConverterUtils.getReadConverterContext(keyName,
-        partIndex)
 
     private lazy val readers = columnReaders(converterCtx)
 
@@ -242,6 +237,7 @@ class H2ORDD[A <: Product: TypeTag: ClassTag, T <: Frame] private(@transient val
           }
         }
 
+    override val selectedColumnIndices: Array[Int] = colNamesInFrame.indices.toArray
   }
 
 
