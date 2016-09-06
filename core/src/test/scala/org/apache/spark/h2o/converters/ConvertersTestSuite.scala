@@ -496,21 +496,6 @@ println("--------1-------")
     h2oFrameEnum.delete()
   }
 
-  def makeH2OFrame[T: ClassTag](fname: String, colNames: Array[String], chunkLayout: Array[Long],
-                                 data: Array[Array[T]], h2oType: Byte, colDomains: Array[Array[String]] = null): H2OFrame = {
-    var f: Frame = new Frame(Key.make(fname))
-    FrameUtils.preparePartialFrame(f,colNames)
-    f.update()
-
-    for( i <- chunkLayout.indices) { buildChunks(fname, data(i), i, Array(h2oType)) }
-
-    f = DKV.get(fname).get()
-
-    FrameUtils.finalizePartialFrame(f, chunkLayout, colDomains, Array(h2oType))
-
-    new H2OFrame(f)
-  }
-
   def fp(it:Iterator[Row]):Unit = {
     println(it.size)
   }
