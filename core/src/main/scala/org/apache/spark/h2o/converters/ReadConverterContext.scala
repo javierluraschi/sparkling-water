@@ -83,7 +83,7 @@ trait ReadConverterContext {
   protected type TypeName = String
   case class Reader(name: Any, apply: Int => Any)
 
-  val readerMap: Map[TypeName, Reader]
+  val readerMapByName: Map[TypeName, Reader]
 
   /**
     * For a given array of source column indexes and required data types,

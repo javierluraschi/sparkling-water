@@ -88,7 +88,7 @@ class H2ORDD[A <: Product: TypeTag: ClassTag, T <: Frame] private(@transient val
 
   private val jc = implicitly[ClassTag[A]].runtimeClass
 
-  private def columnReaders(rcc: ReadConverterContext) = columnTypeNames map rcc.readerMap
+  private def columnReaders(rcc: ReadConverterContext) = columnTypeNames map rcc.readerMapByName
 
   private def opt[X](op: => Any): Option[X] = try {
     Option(op.asInstanceOf[X])

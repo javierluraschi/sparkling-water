@@ -124,10 +124,12 @@ class InternalReadConverterContext(override val keyName: String, override val ch
       })
     )
 
-  private lazy val availableReaders: Map[TypeName, Reader] =
+  private lazy val availableReadersByName: Map[TypeName, Reader] =
     OptionReaders flatMap twoReaders.tupled
 
-  lazy val readerMap: Map[TypeName, Reader] = availableReaders withDefaultValue DefaultReader
+  lazy val readerMapByName: Map[TypeName, Reader] = availableReadersByName withDefaultValue DefaultReader
+
+//  lazy val readerMap: Map[SupportedType, Reader] = availableReaders withDefaultValue DefaultReader
 
   def columnValueProviders(columnIndexesWithTypes: Array[(Int, DataType)]): Array[() => Option[Any]] = {
     for {
