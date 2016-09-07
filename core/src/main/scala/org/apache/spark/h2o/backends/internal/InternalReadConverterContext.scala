@@ -20,6 +20,7 @@ package org.apache.spark.h2o.backends.internal
 import java.util.UUID
 
 import org.apache.spark.h2o.converters.ReadConverterContext
+import org.apache.spark.h2o.utils.ReflectionUtils.NameOfType
 import org.apache.spark.sql.types.DataType
 import water.fvec.{Chunk, Frame, Vec}
 import water.parser.BufferedString
@@ -83,12 +84,12 @@ class InternalReadConverterContext(override val keyName: String, override val ch
 
   /**
     * Given a a column number, returns an Option[T]
-    * with the value parsed according to TypeName.
+    * with the value parsed according to NameOfType.
     * You can override it.
     *
     * A map from type name to option reader
     */
-  lazy val OptionReaders: Map[TypeName, Int => Option[Any]] = Map(
+  lazy val OptionReaders: Map[NameOfType, Int => Option[Any]] = Map(
     "Boolean"    -> getBoolean,
     "Byte"       -> getByte,
     "Double"     -> getDouble,
@@ -104,7 +105,7 @@ class InternalReadConverterContext(override val keyName: String, override val ch
     * Given a type name, returns a default value for the case it's NaN in spark
     * You can override it.
     */
-  val Defaults: Map[TypeName, Any] = Map(
+  val Defaults: Map[NameOfType, Any] = Map(
     "Boolean"   -> false,
     "Byte"      -> 0.toByte,
     "Double"    -> Double.NaN,
@@ -117,17 +118,17 @@ class InternalReadConverterContext(override val keyName: String, override val ch
     "Timestamp" -> 0L
   )
 
-  private def twoReaders = (key: TypeName, op: Int => Option[Any]) =>
-    List((s"Option[$key]":TypeName) -> Reader(s"Option[$key]":TypeName, op),
+  private def twoReaders = (key: NameOfType, op: Int => Option[Any]) =>
+    List((s"Option[$key]":NameOfType) -> Reader(s"Option[$key]":NameOfType, op),
       key                            -> Reader(key, (col: Int) => {
         op.apply(col).getOrElse(Defaults(key))
       })
     )
 
-  private lazy val availableReadersByName: Map[TypeName, Reader] =
+  private lazy val availableReadersByName: Map[NameOfType, Reader] =
     OptionReaders flatMap twoReaders.tupled
 
-  lazy val readerMapByName: Map[TypeName, Reader] = availableReadersByName withDefaultValue DefaultReader
+  lazy val readerMapByName: Map[NameOfType, Reader] = availableReadersByName withDefaultValue DefaultReader
 
 //  lazy val readerMap: Map[SupportedType, Reader] = availableReaders withDefaultValue DefaultReader
 

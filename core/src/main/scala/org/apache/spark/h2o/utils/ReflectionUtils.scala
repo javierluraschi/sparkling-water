@@ -30,7 +30,7 @@ import scala.reflect.runtime.universe._
  * Work with reflection only inside this helper.
  */
 object ReflectionUtils {
-  protected type NameOfType = String
+  type NameOfType = String
 
   def theTypeOf[T:TypeTag] = typeOf[T]
 
@@ -212,7 +212,7 @@ object ReflectionUtils {
 
 import ReflectionUtils._
 
-case class ProductMember(name: String, typeName: TypeName) {
+case class ProductMember(name: String, typeName: NameOfType) {
   override def toString = s"$name: $typeName"
 }
 

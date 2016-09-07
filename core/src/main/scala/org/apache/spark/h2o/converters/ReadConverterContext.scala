@@ -17,6 +17,7 @@
 
 package org.apache.spark.h2o.converters
 
+import org.apache.spark.h2o.utils.ReflectionUtils._
 import org.apache.spark.h2o.utils.SupportedTypes
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
@@ -80,10 +81,9 @@ trait ReadConverterContext {
 
   def readerFor(dt: DataType): OptionReader = OptionReader(bySparkType(dt), ReaderPerType(bySparkType(dt)))
 
-  protected type TypeName = String
   case class Reader(name: Any, apply: Int => Any)
 
-  val readerMapByName: Map[TypeName, Reader]
+  val readerMapByName: Map[NameOfType, Reader]
 
   /**
     * For a given array of source column indexes and required data types,
