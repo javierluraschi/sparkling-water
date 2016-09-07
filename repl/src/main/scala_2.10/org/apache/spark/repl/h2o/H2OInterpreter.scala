@@ -25,8 +25,8 @@ package org.apache.spark.repl.h2o
 
 import java.net.URI
 
+import org.apache.spark.SparkContext
 import org.apache.spark.util.Utils
-import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.Predef.{println => _, _}
 import scala.language.{existentials, implicitConversions, postfixOps}
@@ -44,7 +44,7 @@ class H2OInterpreter(sparkContext: SparkContext, sessionId: Int) extends BaseH2O
 
 
   private def getAddedJars(): Array[String] = {
-    val conf = new SparkConf().setMaster(sparkContext.master)
+    val conf = sparkContext.getConf
     val envJars = sys.env.get("ADD_JARS")
     if (envJars.isDefined) {
       logWarning("ADD_JARS environment variable is deprecated, use --jar spark submit argument instead")

@@ -17,7 +17,6 @@
 package water.api
 
 import org.apache.spark.SparkContext
-import org.apache.spark.h2o.H2OContext
 import org.apache.spark.h2o.util.SharedSparkTestContext
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -121,7 +120,7 @@ class ScalaCodeHandlerSuite extends FunSuite with SharedSparkTestContext with Be
 
     assert(result.output.equals(""),"Printed output should be empty")
     assert(result.status.equals("Error"),"Status should be Error")
-    assert(result.response.equals("<console>:33: error: not found: value foo\n              foo\n              ^\n"),"Response should not be empty")
+    assert(result.response.contains(" error: not found: value foo"), s"Response was: ${result.response}")
   }
 
   test("ScalaCodeHandler.interpret() method, using previously defined class"){
