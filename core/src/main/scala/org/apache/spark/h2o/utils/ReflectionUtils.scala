@@ -81,7 +81,6 @@ object ReflectionUtils {
 
   def productMembers[T:TypeTag]: Array[ProductMember] = {
     val st = typeOf[T]
-    println(s"PMS1 $st")
     val formalTypeArgs = st.typeSymbol.asClass.typeParams
     val TypeRef(_, _, actualTypeArgs) = st
     val attr = st.members.sorted
