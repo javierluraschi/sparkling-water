@@ -146,6 +146,8 @@ private[repl] abstract class BaseH2OInterpreter(val sparkContext: SparkContext, 
     * Run all thunks after the interpreter has been initialized and throw exception if anything went wrong
     */
   private[repl] def postInitialization() {
+    // set the context classloader to classloader of this repl
+    intp.setContextClassLoader()
     try {
       runThunks()
     } catch {
