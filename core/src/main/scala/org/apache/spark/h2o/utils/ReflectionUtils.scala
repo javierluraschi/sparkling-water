@@ -21,17 +21,24 @@ import org.apache.spark.h2o.utils.SupportedTypes._
 import org.apache.spark.sql.types._
 import water.api.API
 import water.fvec.Vec
-import language.postfixOps
+
+import scala.language.postfixOps
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe._
 
 /**
  * Work with reflection only inside this helper.
  */
 object ReflectionUtils {
-  import scala.reflect.runtime.universe._
+  protected type NameOfType = String
 
-  def fieldNamesOf[T: TypeTag] : Array[String] = {
-    typeOf[T].members.sorted.collect { case m if !m.isMethod => m.name.toString.trim }.toArray
+  def theTypeOf[T:TypeTag] = typeOf[T]
+
+  def fieldNamesOf(t: Type) : Array[String] = {
+    t.members.sorted.collect { case m if !m.isMethod => m.name.toString.trim }.toArray
   }
+
+  def fieldNamesOf[T: TypeTag] : Array[String] = fieldNamesOf(typeOf[T])
 
   def vecTypesOf[T:TypeTag]: Array[VecType] = memberTypesOf[T] map (_.vecType)
 
@@ -41,7 +48,8 @@ object ReflectionUtils {
     supportedTypesOf[T](nameFilter)
   }
 
-  def listMemberTypes(st: Type, nameFilter: Array[String]): Array[Type] = {
+  def listMemberTypes[T:TypeTag](nameFilter: Array[String]): Array[Type] = {
+    val st = typeOf[T]
     val formalTypeArgs = st.typeSymbol.asClass.typeParams
     val TypeRef(_, _, actualTypeArgs) = st
     val attr = st.members.sorted
@@ -49,6 +57,38 @@ object ReflectionUtils {
       .filter( s => nameFilter.contains(s.name.toString.trim))
       .map( s =>
         s.typeSignature.substituteTypes(formalTypeArgs, actualTypeArgs)
+      )
+    attr toArray
+  }
+
+  def types(st: Type): Array[Class[_]] = {
+    val names = fieldNamesOf(st)
+    val tt = listMemberTypes(st, names)
+    tt map (supportedTypeFor(_).javaClass) toArray
+  }
+
+  def listMemberTypes(st: Type, nameFilter: Array[String]): Seq[Type] = {
+    val formalTypeArgs = st.typeSymbol.asClass.typeParams
+    val TypeRef(_, _, actualTypeArgs) = st
+    val attr = st.members.sorted
+      .filter(!_.isMethod)
+      .filter( s => nameFilter.contains(s.name.toString.trim))
+      .map( s =>
+        s.typeSignature.substituteTypes(formalTypeArgs, actualTypeArgs)
+      )
+    attr
+  }
+
+  def productMembers[T:TypeTag]: Array[ProductMember] = {
+    val st = typeOf[T]
+    println(s"PMS1 $st")
+    val formalTypeArgs = st.typeSymbol.asClass.typeParams
+    val TypeRef(_, _, actualTypeArgs) = st
+    val attr = st.members.sorted
+      .filter(!_.isMethod)
+        .map(s => (s.name.toString.trim, s))
+      .map( p =>
+        ProductMember(p._1, supportedTypeFor(p._2.typeSignature.substituteTypes(formalTypeArgs, actualTypeArgs)).toString)
       )
     attr toArray
   }
@@ -62,6 +102,11 @@ object ReflectionUtils {
     val types: Seq[Type] = listMemberTypes(typeOf[T], nameFilter)
     nameTheseTypes(types)
   }
+
+//  def typeNames2[T: TypeTag](): Array[String] = {
+//    val types: Seq[Type] = listMemberTypes(typeOf[T], nameFilter)
+//    nameTheseTypes(types)
+//  }
 
   private def nameTheseTypes(tt: Seq[Type]) : Array[String] = {
     tt map typeName toArray
@@ -109,27 +154,18 @@ object ReflectionUtils {
     }
   }
 
-  def supportedTypeFor(tpe: Type) : SupportedType = {
-    if (tpe <:< typeOf[Option[_]]) {
-      val TypeRef(_, _, Seq(optType)) = tpe
-      supportedTypeFor(optType)
-    } else {
-      SupportedTypes.all find (_.matches(tpe)) getOrElse {
-        throw new IllegalArgumentException(s"Type $tpe is not supported!")
-      }
-    }
-  }
+  def supportedTypeFor(tpe: Type) : SupportedType = SupportedTypes.byType(tpe)
 
   def classFor(tpe: Type) : Class[_] = supportedTypeFor(tpe).javaClass
 
-  def vecTypeFor(t: Class[_]): Byte = ClassIndex(t).vecType
+  def vecTypeFor(t: Class[_]): Byte = byClass(t).vecType
 
   def vecTypeFor(t: Type): Byte = vecTypeFor(classFor(t))
 
   def vecTypeOf[T](implicit ttag: TypeTag[T]) = vecTypeFor(typeOf[T])
 
   /** Method translating SQL types into Sparkling Water types */
-  def vecTypeFor(dt : DataType) : Byte = SparkIndex(dt).vecType
+  def vecTypeFor(dt : DataType) : Byte = bySparkType(dt).vecType
 
   import SupportedTypes._
 
@@ -137,10 +173,10 @@ object ReflectionUtils {
     * Return catalyst structural type for given H2O vector.
     *
     * The mapping of type is flat.
-    * @throws IllegalArgumentException if type is recognized
     *
     * @param v H2O vector
     * @return catalyst data type
+    * @throws IllegalArgumentException if type is recognized
     */
   def dataTypeFor(v: Vec): DataType = supportedType(v).sparkType
 
@@ -172,5 +208,30 @@ object ReflectionUtils {
         Long
       }
     } else Double
+  }
+}
+
+import ReflectionUtils._
+
+case class ProductMember(name: String, typeName: TypeName) {
+  override def toString = s"$name: $typeName"
+}
+
+case class ProductType(val members: Array[ProductMember]) {
+  lazy val memberNames = members map (_.name)
+  lazy val memberTypeNames = members map (_.typeName)
+
+  def arity = members.length
+
+  def isSingleton = arity == 1
+
+  override def toString = s"ProductType(${members mkString ","})"
+}
+
+object ProductType {
+  def create[A <: Product: TypeTag: ClassTag]: ProductType = {
+    val members = productMembers[A]
+
+    new ProductType(members)
   }
 }

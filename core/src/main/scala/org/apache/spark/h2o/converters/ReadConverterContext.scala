@@ -78,7 +78,7 @@ trait ReadConverterContext {
     Timestamp -> getTimestamp
   ) withDefault (t => throw new scala.IllegalArgumentException(s"Type $t not supported for conversion from H2OFrame to Spark's Dataframe"))
 
-  def readerFor(dt: DataType): OptionReader = OptionReader(SparkIndex(dt), ReaderPerType(SparkIndex(dt)))
+  def readerFor(dt: DataType): OptionReader = OptionReader(bySparkType(dt), ReaderPerType(bySparkType(dt)))
 
   protected type TypeName = String
   case class Reader(name: Any, apply: Int => Any)
