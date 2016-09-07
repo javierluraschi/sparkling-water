@@ -59,7 +59,9 @@ class InternalReadConverterContext(override val keyName: String, override val ch
 
   private def uuidString(chunk: Chunk) = new UUID(chunk.at16h(rowIdx), chunk.at16l(rowIdx)).toString
 
-  private def plainString(chunk: Chunk) = chunk.atStr(new BufferedString(), rowIdx).toString
+  private def plainString(chunk: Chunk) = {
+    chunk.atStr(new BufferedString(), rowIdx).toString
+  }
 
   val StringProviders = Map[Byte, (Chunk => String)](
     Vec.T_CAT -> categoricalString,

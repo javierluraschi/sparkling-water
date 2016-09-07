@@ -21,7 +21,7 @@ package org.apache.spark.h2o.converters
 import java.lang.reflect.Constructor
 
 import org.apache.spark.h2o.H2OConf
-import org.apache.spark.h2o.utils.ReflectionUtils
+import org.apache.spark.h2o.utils.{ReflectionUtils, ProductType}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 import water.fvec.Frame
@@ -29,66 +29,60 @@ import water.fvec.Frame
 import scala.language.postfixOps
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-import ReflectionUtils._
 
 /**
   * Convert H2OFrame into an RDD (lazily).
   *
   * @param frame  an instance of H2O frame
-  * @param colNamesInResult names of columns
+  * @param productType precalculated deconstructed type of result
   * @param sc  an instance of Spark context
   * @tparam A  type for resulting RDD
   * @tparam T  specific type of H2O frame
   */
 private[spark]
 class H2ORDD[A <: Product: TypeTag: ClassTag, T <: Frame] private(@transient val frame: T,
-                                                                  val colNamesInResult: Array[String])
+                                                                  val productType: ProductType)
                                                                  (@transient sc: SparkContext)
   extends {
     override val isExternalBackend = H2OConf(sc).runsInExternalClusterMode
   } with RDD[A](sc, Nil) with H2ORDDLike[T] {
 
-  // Get column names before building an RDD
+//  @transient lazy val productType: ProductType = ProductType.create[A]
+
+  // Get product type before building an RDD
   def this(@transient fr : T)
-          (@transient sc: SparkContext) = this(fr, fieldNamesOf[A])(sc)
+          (@transient sc: SparkContext) = this(fr, ProductType.create[A])(sc)
+
+  def mkString(seq: Seq[_], sep: Any) = if (seq == null) "(null)" else seq.mkString(sep.toString)
 
   // Check that H2OFrame & given Scala type are compatible
-  if (colNamesInResult.length > 1) {
-    colNamesInResult.foreach { name =>
-      if (frame.find(name) == -1) {
-        throw new IllegalArgumentException("Scala type has field " + name +
-          " but H2OFrame does not have a matching column; has " + frame.names().mkString(","))
-      }
+  if (!productType.isSingleton) {
+    val problems = productType.members.filter { m => frame.find(m.name) == -1} mkString ", "
+
+    if (problems.nonEmpty) {
+      throw new IllegalArgumentException(s"The following fields are missing in frame: $problems; " +
+                                         "we have " + colNamesInFrame.mkString(","))
     }
   }
 
-  /** Number of columns in the full dataset */
-  val numColsInFrame = frame.numCols()
+  lazy val colNamesInFrame = frame.names()
 
-  val colNamesInFrame = frame.names()
-
-  // the following two lines are for some future development;
-  // they can as well be uncommented when needed
-//  val types = ReflectionUtils.types[A](colNamesInResult)
-//  val expectedTypesAll: Option[Array[Byte]] = ConverterUtils.prepareExpectedTypes(isExternalBackend, types)
+  // the following two lines are for some future development
+    val types = ReflectionUtils.types(typeOf[A])
+    val expectedTypesAll: Option[Array[Byte]] = ConverterUtils.prepareExpectedTypes(isExternalBackend, types)
 
   /**
-   * :: DeveloperApi ::
-   * Implemented by subclasses to compute a given partition.
-   */
+    * :: DeveloperApi ::
+    * Implemented by subclasses to compute a given partition.
+    */
   override def compute(split: Partition, context: TaskContext): Iterator[A] = {
     val iterator = new H2ORDDIterator(frameKeyName, split.index)
     ConverterUtils.getIterator[A](isExternalBackend, iterator)
   }
 
-  /**
-    * Names of types are used to refer the readers, which are indexed by types
-    */
-  private lazy val columnTypeNames = typeNamesOf[A](colNamesInResult)
-
   private val jc = implicitly[ClassTag[A]].runtimeClass
 
-  private def columnReaders(rcc: ReadConverterContext) = columnTypeNames map rcc.readerMapByName
+  private def columnReaders(rcc: ReadConverterContext) = productType.memberTypeNames map rcc.readerMapByName
 
   private def opt[X](op: => Any): Option[X] = try {
     Option(op.asInstanceOf[X])
@@ -99,15 +93,15 @@ class H2ORDD[A <: Product: TypeTag: ClassTag, T <: Frame] private(@transient val
   }
   // maps data columns to product components
   val columnMapping: Array[Int] =
-    if (columnTypeNames.length == 1) Array(0) else multicolumnMapping
+    if (productType.isSingleton) Array(0) else multicolumnMapping
 
   def multicolumnMapping: Array[Int] = {
     try {
-      val mappings: Array[Int] = colNamesInResult map (colNamesInFrame indexOf _)
+      val mappings: Array[Int] = productType.members map (colNamesInFrame indexOf _.name)
 
       val bads = mappings.zipWithIndex collect {
         case (j, at) if j < 0 =>
-          if (at < colNamesInResult.length) colNamesInResult(at) else s"[[$at]] (column of type ${columnTypeNames(at)}"
+          if (at < productType.arity) productType.members(at).toString else s"[[$at]] (unknown type)"
       }
 
       if (bads.nonEmpty) {
@@ -170,8 +164,8 @@ class H2ORDD[A <: Product: TypeTag: ClassTag, T <: Frame] private(@transient val
         a
       } else {
         throw new NoSuchElementException(s"No more elements in this iterator: found $total  out of ${converterCtx.numRows}")
-            }
       }
+    }
 
     /**
       * This function takes a row of raw data (array of Objects) and transforms it
@@ -186,22 +180,22 @@ class H2ORDD[A <: Product: TypeTag: ClassTag, T <: Frame] private(@transient val
       *
       * @return Option[A], that is Some(result:A), if succeeded, or else None
       */
-      private def readOne(): Option[A] = {
-            val data = extractRow
+    private def readOne(): Option[A] = {
+      val data = extractRow
 
-            val res: Seq[A] = for {
-              builder <- builders
-              instance <- builder(data)
-            } yield instance
+      val res: Seq[A] = for {
+        builder <- builders
+        instance <- builder(data)
+      } yield instance
 
-            res.toList match {
-              case Nil => None
-              case unique :: Nil => Option(unique)
-              case one :: two :: more =>
-                throw new scala.IllegalArgumentException(
-                                         s"found more than one $jc constructor for given args - can't choose")
-          }
-        }
+      res.toList match {
+        case Nil => None
+        case unique :: Nil => Option(unique)
+        case one :: two :: more =>
+          throw new scala.IllegalArgumentException(
+            s"found more than one $jc constructor for given args - can't choose")
+      }
+    }
 
   }
 
@@ -210,11 +204,11 @@ class H2ORDD[A <: Product: TypeTag: ClassTag, T <: Frame] private(@transient val
 
     val cs = jc.getConstructors
     val found = cs.collect {
-      case c if c.getParameterTypes.length == colNamesInResult.length => c
+      case c if c.getParameterTypes.length == productType.arity => c
     }
 
     if (found.isEmpty) throw new scala.IllegalArgumentException(
-      s"Constructor must take exactly ${colNamesInResult.length} args")
+      s"Constructor must take exactly ${productType.arity} args")
 
     found
   }

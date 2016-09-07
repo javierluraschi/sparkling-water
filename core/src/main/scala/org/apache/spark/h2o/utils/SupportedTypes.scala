@@ -59,6 +59,7 @@ object SupportedTypes extends Enumeration {
       case TypeRef(_, _, Seq(innerType)) => contentType matches innerType
       case _ => false
     }
+    override def toString = s"Option[$contentType]"
   }
 
   import java.{lang => jl, sql => js}

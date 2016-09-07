@@ -32,8 +32,6 @@ import scala.reflect.runtime.universe._
 object ReflectionUtils {
   type NameOfType = String
 
-  def theTypeOf[T:TypeTag] = typeOf[T]
-
   def fieldNamesOf(t: Type) : Array[String] = {
     t.members.sorted.collect { case m if !m.isMethod => m.name.toString.trim }.toArray
   }
@@ -42,37 +40,24 @@ object ReflectionUtils {
 
   def vecTypesOf[T:TypeTag]: Array[VecType] = memberTypesOf[T] map (_.vecType)
 
-  def memberTypesOf[T](implicit ttag: TypeTag[T]): Array[SupportedType] = {
-    val st = typeOf[T]
-    val nameFilter = fieldNamesOf[T]
-    supportedTypesOf[T](nameFilter)
-  }
-
-  def listMemberTypes[T:TypeTag](nameFilter: Array[String]): Array[Type] = {
-    val st = typeOf[T]
-    val formalTypeArgs = st.typeSymbol.asClass.typeParams
-    val TypeRef(_, _, actualTypeArgs) = st
-    val attr = st.members.sorted
-      .filter(!_.isMethod)
-      .filter( s => nameFilter.contains(s.name.toString.trim))
-      .map( s =>
-        s.typeSignature.substituteTypes(formalTypeArgs, actualTypeArgs)
-      )
-    attr toArray
+  def memberTypesOf[T](implicit ttag: TypeTag[T]): Array[SupportedType] =  {
+    val types: Seq[Type] = listMemberTypes(typeOf[T])
+    types map supportedTypeFor toArray
   }
 
   def types(st: Type): Array[Class[_]] = {
-    val names = fieldNamesOf(st)
-    val tt = listMemberTypes(st, names)
+    val tt = listMemberTypes(st)
     tt map (supportedTypeFor(_).javaClass) toArray
   }
 
-  def listMemberTypes(st: Type, nameFilter: Array[String]): Seq[Type] = {
+  // TODO(vlad): get rid of this duplication (see productMembers)
+  def listMemberTypes(st: Type): Seq[Type] = {
+    val names = fieldNamesOf(st)
     val formalTypeArgs = st.typeSymbol.asClass.typeParams
     val TypeRef(_, _, actualTypeArgs) = st
     val attr = st.members.sorted
       .filter(!_.isMethod)
-      .filter( s => nameFilter.contains(s.name.toString.trim))
+      .filter( s => names.contains(s.name.toString.trim))
       .map( s =>
         s.typeSignature.substituteTypes(formalTypeArgs, actualTypeArgs)
       )
@@ -90,34 +75,6 @@ object ReflectionUtils {
         ProductMember(p._1, supportedTypeFor(p._2.typeSignature.substituteTypes(formalTypeArgs, actualTypeArgs)).toString)
       )
     attr toArray
-  }
-
-  private def typeName(t: Type): String = {
-    val name = classFor(t).getSimpleName
-    if (t <:< typeOf[Option[_]]) s"Option[$name]" else name
-  }
-
-  def typeNamesOf[T: TypeTag](nameFilter: Array[String]): Array[String] = {
-    val types: Seq[Type] = listMemberTypes(typeOf[T], nameFilter)
-    nameTheseTypes(types)
-  }
-
-//  def typeNames2[T: TypeTag](): Array[String] = {
-//    val types: Seq[Type] = listMemberTypes(typeOf[T], nameFilter)
-//    nameTheseTypes(types)
-//  }
-
-  private def nameTheseTypes(tt: Seq[Type]) : Array[String] = {
-    tt map typeName toArray
-  }
-
-  private def classesOf(tt: Seq[Type]) : Array[Class[_]] = {
-    (tt map classFor).toArray
-  }
-
-  def supportedTypesOf[T: TypeTag](nameFilter: Array[String]): Array[SupportedType] = {
-    val types: Seq[Type] = listMemberTypes(typeOf[T], nameFilter)
-    types map supportedTypeFor toArray
   }
 
   def reflector(ref: AnyRef) = new {
