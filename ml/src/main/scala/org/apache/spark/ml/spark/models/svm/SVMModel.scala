@@ -20,7 +20,7 @@ import hex.ModelMetricsSupervised.MetricBuilderSupervised
 import hex._
 import water.codegen.CodeGeneratorPipeline
 import water.util.{JCodeGen, SBPrintStream}
-import water.{H2O, Key, Keyed}
+import water.{H2O, Key}
 
 object SVMModel {
 
@@ -32,7 +32,7 @@ object SVMModel {
 
 }
 
-class SVMModel private[svm](val selfKey: Key[_ <: Keyed[_ <: Keyed[_ <: AnyRef]]],
+class SVMModel private[svm](val selfKey: Key[SVMModel],
                               val parms: SVMParameters,
                               val output: SVMModel.SVMOutput)
   extends Model[SVMModel, SVMParameters, SVMModel.SVMOutput](selfKey, parms, output) {
@@ -48,6 +48,7 @@ class SVMModel private[svm](val selfKey: Key[_ <: Keyed[_ <: Keyed[_ <: AnyRef]]
     }
 
   protected def score0(data: Array[Double], preds: Array[Double]): Array[Double] = {
+
     java.util.Arrays.fill(preds, 0)
     val pred =
       data.zip(_output.weights).foldRight(_output.interceptor){ case ((d, w), acc) => d * w + acc}
