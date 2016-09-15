@@ -20,7 +20,7 @@ import java.util.UUID
 
 import org.apache.spark.SparkContext
 import org.apache.spark.h2o.{H2OConf, H2OContext, Holder}
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{SQLContext, SparkSession}
 import org.scalatest.Suite
 import water.fvec.{Chunk, FrameUtils, NewChunk, Vec}
 import water.parser.BufferedString
@@ -42,7 +42,6 @@ trait SharedSparkTestContext extends SparkTestContext { self: Suite =>
   override def beforeAll(): Unit = {
     super.beforeAll()
     sc = createSparkContext
-    sqlc = SQLContext.getOrCreate(sc)
     hc = createH2OContext(sc, new H2OConf(sc))
   }
 

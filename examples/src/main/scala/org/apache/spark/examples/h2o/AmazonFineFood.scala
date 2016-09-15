@@ -25,15 +25,16 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.joda.time.{DateTimeZone, MutableDateTime}
 import water.MRTask
 import water.fvec._
-import water.support.{ModelMetricsSupport, SparkContextSupport}
+import water.support.{ModelMetricsSupport, SparkContextSupport, SparkSessionSupport}
 
-object AmazonFineFood extends SparkContextSupport with ModelMetricsSupport {
+object AmazonFineFood extends SparkContextSupport with SparkSessionSupport with ModelMetricsSupport {
 
   def main(args: Array[String]): Unit = {
     val conf: SparkConf = configure("Amazon Fine Food Review Sentiment Analysis")
-    val sc = new SparkContext(conf)
+    val sc = sparkContext(conf)
 
-    implicit val sqlContext = SparkSession.builder().getOrCreate().sqlContext
+    import spark.implicits._ // import implicit conversions
+
     @transient val hc = H2OContext.getOrCreate(sc)
 
     val reviews = new H2OFrame(new java.io.File("/Users/michal/Tmp/amazon-fine-foods/Reviews.csv"))

@@ -62,7 +62,7 @@ class H2OInterpreter(sparkContext: SparkContext, sessionId: Int) extends BaseH2O
       settings.embeddedDefaults(loader)
     }
 
-    val conf = new SparkConf()
+    val conf = sparkConf
     val jars = Utils.getUserJars(conf, isShell = true).mkString(File.pathSeparator)
     val interpArguments = List(
       "-Yrepl-class-based", // ensure that lines in REPL are wrapped in the classes instead of objects

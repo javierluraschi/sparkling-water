@@ -26,15 +26,13 @@ import hex.deeplearning.DeepLearningModel.DeepLearningParameters.Activation
 import hex.tree.gbm.GBM
 import hex.tree.gbm.GBMModel.GBMParameters
 import org.apache.spark.h2o.{H2OContext, H2OFrame}
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.{SparkConf, SparkContext, SparkFiles}
+import org.apache.spark.{SparkConf, SparkFiles}
 import water.Key
 import water.fvec.Frame
-import water.support.SparkContextSupport
+import water.support.{SparkContextSupport, SparkSessionSupport}
 
 /** Demo for meetup presented at 12/17/2014 */
-object AirlinesWithWeatherDemo2 extends SparkContextSupport {
+object AirlinesWithWeatherDemo2 extends SparkContextSupport with SparkSessionSupport {
 
   def residualPlotRCode(prediction:Frame, predCol: String, actual:Frame, actCol:String, h2oContext: H2OContext = null):String = {
     val (ip, port) = if (h2oContext != null) {
@@ -66,14 +64,14 @@ object AirlinesWithWeatherDemo2 extends SparkContextSupport {
   }
 
   def main(args: Array[String]): Unit = {
-    FIXME use Spark session here
     // Configure this application
     val conf: SparkConf = configure("Sparkling Water Meetup: Use Airlines and Weather Data for delay prediction")
     // Create SparkContext to execute application on Spark cluster
-    val sc = new SparkContext(conf)
-    implicit val sqlContext = SQLContext.getOrCreate(sc)
-    import sqlContext.implicits._ // import implicit conversions
-    val h2oContext = H2OContext.getOrCreate(sc)
+    val sc = sparkContext(conf)
+
+    import spark.implicits._ // import implicit conversions
+
+    @transient val h2oContext = H2OContext.getOrCreate(sc)
     import h2oContext._
     import h2oContext.implicits._
     // Setup environment
