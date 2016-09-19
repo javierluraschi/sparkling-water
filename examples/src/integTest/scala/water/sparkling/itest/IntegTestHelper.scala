@@ -32,10 +32,12 @@ trait IntegTestHelper extends BeforeAndAfterEach { self: Suite =>
       Seq("--conf", s"spark.driver.extraJavaOptions=-XX:MaxPermSize=384m -Dhdp.version=${env.hdpVersion}") ++
       Seq("--conf", s"spark.yarn.am.extraJavaOptions=-XX:MaxPermSize=384m -Dhdp.version=${env.hdpVersion}") ++
       Seq("--conf", s"spark.executor.extraJavaOptions=-XX:MaxPermSize=384m -Dhdp.version=${env.hdpVersion}") ++
-      Seq("--conf", "spark.scheduler.minRegisteredResourcesRatio=1") ++
-      Seq("--conf", "spark.ext.h2o.repl.enabled=false") ++ // disable repl in tests
+      Seq("--conf",  "spark.scheduler.minRegisteredResourcesRatio=1") ++
+      Seq("--conf",  "spark.ext.h2o.repl.enabled=false") ++ // disable repl in tests
       Seq("--conf", s"spark.test.home=${env.sparkHome}") ++
       Seq("--conf", s"spark.driver.extraClassPath=${env.assemblyJar}") ++
+      Seq("--conf",  "spark.task.maxFailures=1") ++ // Any task failures are suspicious
+      Seq("--conf",  "spark.rpc.numRetries=1") ++ // Any RPC failures are suspicious
       env.sparkConf.flatMap( p => Seq("--conf", s"${p._1}=${p._2}") ) ++
       Seq[String](env.itestJar)
 
@@ -115,14 +117,14 @@ object LocalTest extends Tag("water.sparkling.itest.LocalTest")
 object StandaloneTest extends Tag("water.sparkling.itest.StandaloneTest")
 
 
-trait IntegTestStopper extends org.apache.spark.Logging {
+trait IntegTestStopper {
 
   def exitOnException(f: => Unit): Unit ={
     try {
       f
     } catch {
       case t: Throwable => {
-        logError("Test throws exception!", t)
+        //logError("Test throws exception!", t)
         t.printStackTrace()
         water.H2O.exit(-1)
       }
