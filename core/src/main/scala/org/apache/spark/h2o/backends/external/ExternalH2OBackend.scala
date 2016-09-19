@@ -37,7 +37,7 @@ class ExternalH2OBackend(val hc: H2OContext) extends SparklingBackend with Exter
     H2OStarter.start(h2oClientArgs, false)
 
     // Register web API for client
-    RestAPIManager.registerClientWebAPI(hc)
+    RestAPIManager(hc).registerAll()
     H2O.finalizeRegistration()
 
     if(hc.getConf.numOfExternalH2ONodes.isDefined){
@@ -70,10 +70,28 @@ class ExternalH2OBackend(val hc: H2OContext) extends SparklingBackend with Exter
   override def checkAndUpdateConf(conf: H2OConf): H2OConf = {
     super.checkAndUpdateConf(conf)
 
-    if(conf.cloudName.isEmpty){
-      throw new IllegalArgumentException(
-        """Cloud name has to be specified when using external backend cluster mode. It can be set either using H2OConf
-          |instance or via 'spark.ext.h2o.cloud.name' spark configuration property""".stripMargin)
+    if(conf.autoStartMode){
+
+      if(conf.h2oDriverPath.isEmpty && conf.hadoopVersion.isEmpty){
+        throw new IllegalArgumentException("" +
+          """Path to H2O Driver or hadoop version for which the corresponding hadoop driver will
+            | be downloaded automatically has to be specified in external backend mode in auto start mode.
+          """.stripMargin)
+      }else{
+        log.info("Downloading and setting h2o driver !!!")
+        ExternalBackendConf.downloadH2ODriverIfNecessary(conf)
+      }
+
+      if(conf.numOfExternalH2ONodes.isEmpty){
+        throw new IllegalArgumentException("Number of h2o nodes has to be specified in external auto start backend mode.")
+      }
+
+    }else{
+      if(conf.cloudName.isEmpty){
+        throw new IllegalArgumentException(
+          """Cloud name has to be specified when using external backend cluster mode in manual start mode. It can be set either using H2OConf
+            |instance or via 'spark.ext.h2o.cloud.name' spark configuration property""".stripMargin)
+      }
     }
 
     SparklingEnv.setConf(conf)
