@@ -104,7 +104,7 @@ trait SparkDataFrameConverter extends Logging with ConverterUtils {
         var i = 0
         var subRow = row
         while (i < path.length - 1 && !subRow.isNullAt(path(i))) {
-          subRow = subRow.getAs[Row](path(i));
+          subRow = subRow.getAs[Row](path(i))
           i += 1
         }
         val aidx = path(i) // actual index into row provided by path
@@ -114,9 +114,9 @@ trait SparkDataFrameConverter extends Logging with ConverterUtils {
           val ary = if (isAry) subRow.getAs[Seq[_]](aidx) else null
           val aryLen = if (isAry) ary.length else -1
           val aryIdx = idx - startOfSeq // shared index to position in array/vector
-          val vec = if (isVec) subRow.getAs[mllib.linalg.Vector](aidx) else null
+          val vecLen = if (isVec) getVecLen(subRow, aidx) else -1
           if (isAry && aryIdx >= aryLen) con.putNA(idx)
-          else if (isVec && aryIdx >= vec.size) con.put(idx, 0.0) // Add zeros for vectors
+          else if (isVec && aryIdx >= vecLen) con.put(idx, 0.0) // Add zeros for double vectors
           else dataType match {
             case BooleanType => con.put(idx, if (isAry)
               if (ary(aryIdx).asInstanceOf[Boolean]) 1 else 0
@@ -131,7 +131,7 @@ trait SparkDataFrameConverter extends Logging with ConverterUtils {
               ary(aryIdx).asInstanceOf[Double]
             } else {
               if (isVec) {
-                subRow.getAs[mllib.linalg.Vector](aidx)(idx - startOfSeq)
+                getVecVal(subRow, aidx, idx - startOfSeq)
               } else {
                 subRow.getDouble(aidx)
               }
@@ -157,6 +157,27 @@ trait SparkDataFrameConverter extends Logging with ConverterUtils {
     (context.partitionId, con.numOfRows)
   }
 
+  private def getVecLen(r: Row, idx: Int): Int = {
+    val value = r.get(idx)
+    if (value.isInstanceOf[mllib.linalg.Vector]) {
+      value.asInstanceOf[mllib.linalg.Vector].size
+    } else if (value.isInstanceOf[ml.linalg.Vector]) {
+      value.asInstanceOf[ml.linalg.Vector].size
+    } else {
+      -1
+    }
+  }
+
+  private def getVecVal(r: Row, ridx: Int, vidx: Int): Double = {
+    val value = r.get(ridx)
+    if (value.isInstanceOf[mllib.linalg.Vector]) {
+      value.asInstanceOf[mllib.linalg.Vector](vidx)
+    } else if (value.isInstanceOf[ml.linalg.Vector]) {
+      value.asInstanceOf[ml.linalg.Vector](vidx)
+    } else {
+      throw new ArrayIndexOutOfBoundsException(s"Row: ${r}, row index: ${ridx}, vector index: ${vidx}")
+    }
+  }
 }
 
 object SparkDataFrameConverter extends SparkDataFrameConverter
