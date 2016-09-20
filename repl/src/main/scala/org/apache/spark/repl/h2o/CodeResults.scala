@@ -21,5 +21,5 @@ package org.apache.spark.repl.h2o
   * Enum representing possible results of code interpreted in scala interpreter
   */
 object CodeResults extends Enumeration {
-val Success, Error, Incomplete, Exception = Value
+  val Success, Error, Incomplete, Exception = Value
 }
