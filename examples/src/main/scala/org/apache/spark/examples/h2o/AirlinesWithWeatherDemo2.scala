@@ -18,6 +18,7 @@
 package org.apache.spark.examples.h2o
 
 import java.io.File
+import java.net.URLClassLoader
 
 import hex.FrameSplitter
 import hex.deeplearning.DeepLearning
@@ -88,7 +89,7 @@ object AirlinesWithWeatherDemo2 extends SparkContextSupport with SparkSessionSup
     // Use super-fast advanced H2O CSV parser !!!
     val airlinesData = new H2OFrame(new File(SparkFiles.get("year2005.csv.gz")))
 
-    val airlinesTable = h2oContext.asDataFrame(airlinesData).map(row => AirlinesParse(row))
+    val airlinesTable = h2oContext.asDataFrame(airlinesData)(sqlContext).map(row => AirlinesParse(row))
     // Select flights only to ORD
     val flightsToORD = airlinesTable.filter(f => f.Dest==Some("ORD"))
 
@@ -149,7 +150,7 @@ object AirlinesWithWeatherDemo2 extends SparkContextSupport with SparkSessionSup
     val dlModel = dl.trainModel.get
 
     val dlPredictTable = dlModel.score(testTable)('predict)
-    val predictionsFromDlModel = asDataFrame(dlPredictTable).collect
+    val predictionsFromDlModel = asDataFrame(dlPredictTable)(sqlContext).collect
                                 .map(row => if (row.isNullAt(0)) Double.NaN else row(0))
 
     println(predictionsFromDlModel.length)

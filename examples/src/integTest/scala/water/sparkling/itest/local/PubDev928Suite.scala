@@ -40,7 +40,7 @@ object PubDev928Test extends SparkContextSupport with IntegTestStopper {
     val conf = configure("PUBDEV-928")
     val sc = new SparkContext(conf)
     val h2oContext = H2OContext.getOrCreate(sc)
-    implicit val sqlContext = new SQLContext(sc)
+    implicit val sqlContext = SQLContext.getOrCreate(sc)
     import sqlContext.implicits._
 
     val airlinesData = new H2OFrame(new java.io.File("examples/smalldata/allyears2k_headers.csv.gz"))
@@ -68,7 +68,7 @@ object PubDev928Test extends SparkContextSupport with IntegTestStopper {
     // Configure Deep Learning algorithm
     val dlParams = new DeepLearningParameters()
     dlParams._train = train.key
-    dlParams._response_column = 'IsDepDelayed
+    dlParams._response_column = "IsDepDelayed"
 
     val dl = new DeepLearning(dlParams)
     val dlModel = dl.trainModel.get
@@ -84,7 +84,8 @@ object PubDev928Test extends SparkContextSupport with IntegTestStopper {
     assert((0 until av.nChunks()).exists(idx => av.chunkForChunkIdx(idx).len() == 0), "At least on chunk with 0-rows has to exist!")
 
     // And run scoring on dataset which contains at least one chunk with zero-lines
-    val predictionH2OFrame = dlModel.score(testFrame)("predict")
+    import h2oContext.implicits._
+    val predictionH2OFrame = dlModel.score(testFrame)('predict)
     assert(predictionH2OFrame.numRows() == testFrame.numRows())
 
     // Shutdown Spark cluster and H2O
