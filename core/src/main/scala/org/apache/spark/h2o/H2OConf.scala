@@ -92,13 +92,13 @@ class H2OConf(@transient val sc: SparkContext) extends Logging with InternalBack
 object H2OConf {
   def apply(sc: SparkContext) = new H2OConf(sc)
 
-  //private var _sparkConfChecked = false
+  private var _sparkConfChecked = false
 
-  //def sparkConfChecked = _sparkConfChecked
+  def sparkConfChecked = _sparkConfChecked
 
   def checkSparkConf(sparkConf: SparkConf): SparkConf = {
-    //_sparkConfChecked = true
-    //sparkConf.set("spark.repl.class.outputDir", H2OInterpreter.classOutputDirectory.getAbsolutePath)
+    _sparkConfChecked = true
+    sparkConf.set("spark.repl.class.outputDir", H2OInterpreter.classOutputDirectory.getAbsolutePath)
     sparkConf
   }
 }
