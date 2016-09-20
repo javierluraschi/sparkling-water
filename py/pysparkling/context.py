@@ -101,13 +101,13 @@ class H2OContext(object):
         """
         h2o_context = H2OContext(spark_context)
 
-       # do not instantiate sqlContext when already one exists
-        self._sqlContext = SQLContext.getOrCreate(self._sc)
+        # do not instantiate sqlContext when already one exists
+        self._sqlContext = SQLContext.getOrCreate(spark_context)
         self._jsc = sparkContext._jsc
         self._jvm = sparkContext._jvm
         self._gw = sparkContext._gateway
 
-       # Create H2OContext using Py4J
+        # Create H2OContext using Py4J
         self._jhc = self._gw.jvm.org.apache.spark.h2o.H2OContext(self._jsc)
 
     def start(self):
